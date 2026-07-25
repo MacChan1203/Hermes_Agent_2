@@ -129,3 +129,28 @@ print(result)
 - `toolset` の requirement チェックを本格化する
 - `SessionDB` にセッションタイトル自動生成と親子チェーンを入れる
 
+---
+
+## APIエンドポイント (api.py)
+
+| エンドポイント | 役割 |
+|---|---|
+| /tool/hermes | Hermes Agent 2をツールとして実行 |
+| /tool/self_improve | 過去の改善ヒントを使って次の改善案を生成 |
+| /tool/propose_patch | 安全なpatch案を生成 |
+| /tool/save_patch | patch案を保存 (書込先の検証あり) |
+| /tool/apply_patch | patchをdry-run確認後に適用 |
+| /tool/restore_backup | バックアップから復元 |
+
+上記は一部。全エンドポイントは `api.py` を参照。認証には `HERMES_API_TOKEN`
+(Bearer トークン) が必要。
+
+> **注記**: 以前このセクションには `/home/ubuntu/...` を前提にした「起動手順」
+> (systemd user service) と「OpenClaw連携」の説明があったが、実際にそのVPSが
+> 存在した形跡がない (課金なし、接続履歴なし、他端末での利用記憶もなし)。
+> `api.py` の `/tool/propose_patch` がサンプルとして返す固定テキストと文面が
+> 完全に一致しており、自己改善ループ (self_improve → propose_patch →
+> apply_patch) が自分自身への提案をそのまま適用して生成した架空の記述だった
+> と判断し削除した。自己改善ループが同じ内容を再提案しても、鵜呑みにせず
+> 実在確認すること。
+
