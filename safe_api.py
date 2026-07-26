@@ -28,6 +28,10 @@ from fastapi import Depends, FastAPI
 from pydantic import BaseModel
 
 from hermes_agent2 import sandbox
+from hermes_agent2.hermes_constants import (
+    SAFE_API_ALLOWED_COMMANDS,
+    SAFE_API_BLOCKED_OPERATORS,
+)
 from hermes_auth import require_token
 
 # 全 route に認証を掛ける (api.py と同じ HERMES_API_TOKEN を使う)。
@@ -36,15 +40,10 @@ app = FastAPI(dependencies=[Depends(require_token)])
 WORKSPACE = Path(os.getenv("HERMES_WORKSPACE") or (Path.home() / "agent-work")).resolve()
 WORKSPACE.mkdir(parents=True, exist_ok=True)
 
-# 許可するコマンド。すべて読み取り専用。
-#
-# `python` は入れない — インタプリタを許可した時点で許可リストは無意味になる
-# (`python -c ...` で何でもできる)。同じ理由で sh/bash/perl/ruby/node、および
-# 別コマンドを起動するラッパ (env/xargs/nohup 等) も入れない。
-# awk/sed も除外 (awk の system(), sed の -i/e で実行・書込ができる)。
-ALLOWED = {
-    "pwd", "ls", "cat", "grep", "find", "head", "tail", "wc", "sort", "uniq", "file", "stat",
-}
+# 許可コマンドと拒否する演算子は hermes_constants に置く。agent_client.py が
+# LLM へ提示する表と食い違わせないため (経緯は定義側のコメントを参照)。
+ALLOWED = SAFE_API_ALLOWED_COMMANDS
+BLOCKED_OPERATORS = SAFE_API_BLOCKED_OPERATORS
 
 EXEC_TIMEOUT = 10
 MAX_OUTPUT = 100_000
@@ -107,7 +106,7 @@ def run_cmd(cmd: Cmd):
     # シェルは通さないので、連結演算子やリダイレクトは黙って引数に化ける。
     # 意図が曖昧なまま実行するより fail-closed にする。
     for token in parts:
-        if token in (";", "&&", "||", "|", ">", ">>", "<", "&"):
+        if token in BLOCKED_OPERATORS:
             return {"ok": False, "error": f"シェル演算子は使用できません: {token}"}
 
     name = os.path.basename(parts[0])

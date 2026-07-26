@@ -10,3 +10,6 @@ docker.env
 *.db
 *.bak
 output.txt
+
+# agent_client.py の実行ログ (ローカルパスや実行結果が入る)
+memory.json
