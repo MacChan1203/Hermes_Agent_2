@@ -6,6 +6,17 @@ __pycache__/
 # Docker コンテナへ渡す秘密 (HERMES_API_TOKEN / TELEGRAM_BOT_TOKEN 等)
 docker.env
 
+# 仮想環境 (1.4GB)。requirements.txt から再構築する。
+.venv/
+
+# stream.py の人物検知スナップショット (EVENT_DIR、既定 events/)。
+# 実測 9,900 ファイル / 2.8GB あり、git status がこれだけで埋まる。
+events/
+
+# YOLO の重み (stream.py の YOLO_MODEL、既定 yolo11n.pt)。
+# ultralytics が初回起動時に自動ダウンロードするため追跡不要。
+*.pt
+
 .DS_Store
 *.db
 *.bak
