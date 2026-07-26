@@ -89,7 +89,7 @@ services:
       # Ollama はホスト側 (brew services) に残す。127.0.0.1 のみで待ち受けて
       # いても Docker Desktop for Mac 経由で到達できることを実測で確認済み。
       OLLAMA_URL: "http://host.docker.internal:11434/api/generate"
-      OLLAMA_MODEL: "qwen3:latest"
+      OLLAMA_MODEL: "qwen3-swallow-8b-64k:latest"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks: [external]

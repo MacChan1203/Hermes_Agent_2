@@ -21,7 +21,7 @@ ALLOWED_USER = str(os.getenv("TELEGRAM_ALLOWED_USERS"))
 #  host.docker.internal 経由の到達を通すため、ホスト側を 0.0.0.0 に開いて
 #  LAN へ晒す必要はない — 実測で確認済み)。
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
-MODEL = os.getenv("OLLAMA_MODEL", "qwen3:latest")
+MODEL = os.getenv("OLLAMA_MODEL", "qwen3-swallow-8b-64k:latest")
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
