@@ -4,6 +4,11 @@ import requests
 from dotenv import dotenv_values
 from pathlib import Path
 
+from hermes_agent2.hermes_constants import (
+    SAFE_API_ALLOWED_COMMANDS,
+    SAFE_API_BLOCKED_OPERATORS,
+)
+
 _HERE = Path(__file__).parent
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
@@ -34,38 +39,33 @@ def load_api_token() -> str:
         )
     return token
 
-SYSTEM = """
-あなたはMac上の安全なローカルエージェントです。
-ユーザーの依頼を、許可された単一のシェルコマンドに変換してください。
+# 許可コマンドは safe_api.py と同じ定数から組み立てる。ここに手書きすると
+# サーバ側の変更に追従できず、「プロンプトは許可と言うがサーバは拒否する」
+# 状態になる (実際に python がその状態だった)。
+# sorted() で並びを固定する — set の反復順は実行ごとに変わり得るため。
+_ALLOWED_LINES = "\n".join(f"- {c}" for c in sorted(SAFE_API_ALLOWED_COMMANDS))
+_OPERATORS = " ".join(SAFE_API_BLOCKED_OPERATORS)
 
-許可コマンド:
-- pwd
-- ls
-- cat
-- grep
-- find
-- python
+SYSTEM = f"""
+あなたは safe_api の読み取り専用サンドボックスを操作するエージェントです。
+ユーザーの依頼を、実行可能な単一のコマンドに変換してください。
 
-禁止:
-- rm
-- sudo
-- chmod
-- chown
-- mv
-- cp
-- curl
-- wget
-- ssh
-- scp
-- brew
-- open
-- osascript
-- /Users 配下の直接指定
-- .env, .ssh, 秘密鍵の読み取り
+許可コマンド (これ以外は必ず拒否されます):
+{_ALLOWED_LINES}
 
-出力は必ずJSONのみ:
-"thought":"どう考えたか",
-{"command":"ここにコマンド"}
+制約:
+- コマンドは1つだけ。次の演算子は引数ではなく演算子として拒否されます: {_OPERATORS}
+- パイプやリダイレクトの代わりに、上記コマンドのオプションを使ってください
+  (例: 先頭10行なら `head -n 10 ファイル`)
+- パスはワークスペース内の相対パスのみ。`~` や外部を指す絶対パスは拒否されます
+- インタプリタ (python, sh, bash 等) とファイルを書き換えるコマンドは許可リストに
+  無いため、それらを必要とする依頼は実行できません
+
+許可コマンドだけでは達成できない依頼の場合、command を空文字 "" にして、
+thought に理由を書いてください。無理に近いコマンドを当てはめないこと。
+
+出力は必ずJSONのみ。thought と command を同じオブジェクトに入れてください:
+{{"thought":"どう考えたか","command":"ここにコマンド"}}
 """
 
 def load_memory():
@@ -135,6 +135,12 @@ if __name__ == "__main__":
 
     print("\n思考:")
     print(thought)
+
+    # 許可コマンドで実現できない依頼はここで打ち切る。空文字を run_safe に
+    # 渡すと safe_api 側の "empty command" になるだけで、理由が伝わらない。
+    if not command.strip():
+        print("\nこの依頼は許可コマンドでは実行できません。")
+        raise SystemExit(0)
 
     print("\n生成コマンド:")
     print(command)
