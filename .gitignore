@@ -2,6 +2,10 @@
 __pycache__/
 *.pyc
 .env
+
+# Docker コンテナへ渡す秘密 (HERMES_API_TOKEN / TELEGRAM_BOT_TOKEN 等)
+docker.env
+
 .DS_Store
 *.db
 *.bak

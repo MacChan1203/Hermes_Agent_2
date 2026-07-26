@@ -1,13 +1,32 @@
 # Hermes Agent 2
+#
+# バージョンは .venv (Python 3.11.9) で実際にテストが通っている値に固定する。
+# 未固定だと Docker ビルド時に別バージョンが入り、ローカルで通った191件の
+# テストとは違う組み合わせで動くことになる。
 fire
 pyyaml
 requests
 rich
 prompt_toolkit
-pydantic>=2.0
+pydantic==2.13.4
 openai
 python-dotenv
 PyJWT[crypto]
 httpx
 jinja2
 tenacity
+
+# --- HTTP API (api.py / safe_api.py) ---
+# 従来 requirements.txt に記載が無く、この記述だけでは API が起動しなかった
+fastapi==0.136.1
+uvicorn==0.46.0
+
+# --- Telegram bot (telegram_bridge.py) ---
+python-telegram-bot==22.6
+
+# --- 音声文字起こし (telegram_whisper_bot.py) ---
+# ctranslate2 を伴う。arm64 Linux でのインストール可否は確認済み
+faster-whisper==1.2.1
+
+# --- テスト ---
+pytest
