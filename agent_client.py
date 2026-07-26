@@ -1,11 +1,38 @@
 import json
+import os
 import requests
+from dotenv import dotenv_values
 from pathlib import Path
 
+_HERE = Path(__file__).parent
+
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-SAFE_API_URL = "http://127.0.0.1:8000/run"
+# safe_api.py の既定は 8001 (8000 は api.py)。compose も 127.0.0.1:8001 で公開する。
+SAFE_API_URL = os.getenv("SAFE_API_URL", "http://127.0.0.1:8001/run")
 MODEL = "qwen3-swallow-8b-64k:latest"
 MEMORY_FILE = Path("memory.json")
+
+# safe_api.py は全 route に Bearer 認証が掛かっている (hermes_auth.require_token)。
+# トークンは docker.env が唯一の置き場なので、環境変数を優先しつつそこから読む。
+# load_dotenv ではなく dotenv_values を使う — docker.env には TELEGRAM_BOT_TOKEN 等も
+# 入っており、このプロセスの os.environ へ撒くと安全側に倒れない。
+TOKEN_ENV = "HERMES_API_TOKEN"
+
+
+def load_api_token() -> str:
+    token = os.getenv(TOKEN_ENV, "")
+    if token:
+        return token
+
+    env_file = _HERE / "docker.env"
+    if env_file.exists():
+        token = (dotenv_values(env_file).get(TOKEN_ENV) or "").strip()
+
+    if not token:
+        raise RuntimeError(
+            f"{TOKEN_ENV} が見つかりません。環境変数で渡すか、{env_file} に設定してください。"
+        )
+    return token
 
 SYSTEM = """
 あなたはMac上の安全なローカルエージェントです。
@@ -93,6 +120,7 @@ def run_safe(command: str):
     res = requests.post(
         SAFE_API_URL,
         json={"command": command},
+        headers={"Authorization": f"Bearer {load_api_token()}"},
         timeout=30,
     )
     res.raise_for_status()
