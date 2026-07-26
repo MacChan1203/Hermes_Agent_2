@@ -292,6 +292,11 @@ def apply_readme_improvement(payload: dict):
 
     hints = load_recent_improvement_hints(limit=5)
 
+    # 「次の改善候補」を固定文で書かない。以前は「README に起動手順、
+    # APIエンドポイント、OpenClaw連携方法を追記する」と書き込んでおり、
+    # /tool/propose_patch の架空 patch がそれを満たす提案に見えてしまう
+    # 対になっていた (コミット 9e2754a の経緯)。候補はヒントログから来る
+    # ものだけにし、無ければ無いと書く。
     section = f"""
 
 ---
@@ -302,9 +307,6 @@ def apply_readme_improvement(payload: dict):
 
 過去の改善ヒント:
 {hints if hints else "- なし"}
-
-次の改善候補:
-- README に起動手順、APIエンドポイント、OpenClaw連携方法を追記する
 """
 
     if not readme_path.exists():
@@ -339,45 +341,26 @@ def propose_patch(payload: dict):
             "error": "現在は README.md のpatch提案のみ対応しています。"
         }
 
-    patch = """--- a/README.md
-+++ b/README.md
-@@
- ## 自己改善メモ
-
- テーマ: Hermes Agent 2をより使いやすくする
-
- 過去の改善ヒント:
- - README に起動手順と設計概要が不足していないか確認する
-
- 次の改善候補:
- - README に起動手順、APIエンドポイント、OpenClaw連携方法を追記する
-+
-+## 起動手順
-+
-+```bash
-+cd ~/hermes-agent2
-+source ~/hermes-venv/bin/activate
-+systemctl --user restart hermes-api.service
-+```
-+
-+## APIエンドポイント
-+
-+| エンドポイント | 役割 |
-+|---|---|
-+| `/tool/hermes` | Hermes Agent 2をツールとして実行 |
-+| `/tool/self_improve` | 過去の改善ヒントを使って次の改善案を生成 |
-+| `/tool/propose_patch` | 安全なpatch案を生成 |
-+
-+## OpenClaw連携
-+
-+OpenClawはOllama/qwen3を主モデルとして使い、Hermesは必要に応じてツールAPIとして呼び出す構成を推奨します。
-"""
+    # patch 生成は未実装。以前はここが固定文字列の patch を返していたが、その
+    # 中身は実在しない配置 (~/hermes-venv、systemd user service) を前提とした
+    # 架空の README 節だった。自己改善ループ (self_improve → propose_patch →
+    # apply_patch) がそれを README へ適用し、コミット 9e2754a で削除する必要が
+    # 生じた (経緯は README の「APIエンドポイント」節の注記を参照)。
+    #
+    # theme も target_file も生成に使われておらず、リポジトリの実状態も見ない。
+    # 「もっともらしい嘘」を返す実装は、正しい内容に書き換えたとしてもレビューを
+    # 通り抜けてしまうため、供給そのものを止める。
     return {
         "tool": "propose_patch",
-        "ok": True,
+        "ok": False,
         "theme": theme,
         "target_file": target_file,
-        "patch": patch
+        "error": (
+            "patch 自動生成は未実装です。以前この endpoint が返していた固定 patch は "
+            "実在しない配置を前提とした架空の内容で、README に適用された後 "
+            "コミット 9e2754a で削除されました。patch は /tool/save_patch に "
+            "本文を渡す形で、内容を確認した上で扱ってください。"
+        ),
     }
 
 _PATCH_HEADER_RE = re.compile(r"^(?:---|\+\+\+)[ \t]+(\S+)", re.MULTILINE)
