@@ -1,0 +1,132 @@
+# Hermes Agent 2 — サービス定義
+#
+# 秘密は docker.env (gitignore 済み) から env_file で注入する。
+# ~/.hermes/.env は 473 行の秘密を含むため **マウントしない**。
+# 必要な値だけを docker.env に書き写して渡すこと。
+#
+# ネットワーク方針 (重要 — 制約と実際の防御):
+#   macOS 実行時は seatbelt が CMD: サブプロセスのネットワークをカーネルで
+#   拒否していたが、Linux コンテナ内ではこの防御が無効になる
+#   (sandbox_available() が darwin 判定のため。コンテナ内テストでは該当6件が
+#    skip されることで確認できる)。
+#
+#   当初 api/safe-api を `internal: true` ネットワークに置いて外向き通信を
+#   塞ごうとしたが、**internal ネットワークではポート公開が機能しない**
+#   (ホスト側に LISTEN が現れない) ことを実測で確認した。Docker では
+#   「受信は許可・送信は禁止」を compose だけでは表現できない。
+#
+#   そのため外向き通信の遮断は、以下の多層で代替している:
+#     1. イメージにネットワーククライアントを入れない
+#        (curl/wget/nc/telnet/ssh いずれも未インストール = CMD: から呼べない)
+#     2. executor の denylist がインタプリタ (python3/perl/ruby/node) と
+#        ランチャ (env/xargs 等) を拒否する
+#     3. safe_api.py の許可リストは読み取り専用コマンドのみ
+#   これらは「コンテナからの外向き通信そのものは技術的に可能」という前提の
+#   上での緩和策であり、カーネル層の遮断と同等ではない。
+#   完全に遮断したい場合は ports: を外して internal ネットワークに戻し、
+#   別コンテナ経由か `docker compose exec` でのみアクセスすること。
+
+services:
+  # ---------------------------------------------------------------------
+  # ツール API (port 8000)
+  # 外部通信は不要 (run_agent.py の既定は local/mock-model)
+  # ---------------------------------------------------------------------
+  api:
+    build: .
+    image: hermes-agent2:latest
+    command: ["python", "api.py"]
+    env_file: [./docker.env]
+    environment:
+      HERMES_API_HOST: "0.0.0.0"   # コンテナ内で 127.0.0.1 に bind すると外から届かない
+      HERMES_API_PORT: "8000"
+    ports:
+      - "127.0.0.1:8000:8000"      # ホスト側はループバックのみに公開
+    networks: [external]           # internal だとポート公開が効かない (上部の注記参照)
+    volumes:
+      - api-memory:/app/memory
+      - api-patches:/app/patches
+      - api-backups:/app/backups
+    read_only: true                # /app 配下への書込を禁止 (自ソース改変の防止)
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # ワークスペース実行 API (port 8001)
+  # 読み取り専用コマンドのみを実行するため外部通信は不要
+  # ---------------------------------------------------------------------
+  safe-api:
+    build: .
+    image: hermes-agent2:latest
+    command: ["python", "safe_api.py"]
+    env_file: [./docker.env]
+    environment:
+      HERMES_API_HOST: "0.0.0.0"
+      HERMES_SAFE_API_PORT: "8001"
+      HERMES_WORKSPACE: "/workspace"
+    ports:
+      - "127.0.0.1:8001:8001"
+    networks: [external]           # internal だとポート公開が効かない (上部の注記参照)
+    volumes:
+      - safe-workspace:/workspace
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Telegram ブリッジ (テキスト -> ホストの Ollama)
+  # api.telegram.org と host.docker.internal:11434 への通信が必要
+  # ---------------------------------------------------------------------
+  telegram-bridge:
+    build: .
+    image: hermes-agent2:latest
+    command: ["python", "telegram_bridge.py"]
+    env_file: [./docker.env]
+    environment:
+      # Ollama はホスト側 (brew services) に残す。127.0.0.1 のみで待ち受けて
+      # いても Docker Desktop for Mac 経由で到達できることを実測で確認済み。
+      OLLAMA_URL: "http://host.docker.internal:11434/api/generate"
+      OLLAMA_MODEL: "qwen3:latest"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks: [external]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------
+  # Telegram 音声文字起こし (faster-whisper)
+  # api.telegram.org への通信が必要。モデルは named volume に保持。
+  # ---------------------------------------------------------------------
+  telegram-whisper:
+    build: .
+    image: hermes-agent2:latest
+    command: ["python", "telegram_whisper_bot.py"]
+    env_file: [./docker.env]
+    environment:
+      HF_HOME: "/models"
+    networks: [external]
+    volumes:
+      - whisper-models:/models
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    profiles: ["whisper"]   # 既定では起動しない (モデル取得に464MB必要)
+
+networks:
+  external:
+    driver: bridge
+
+volumes:
+  api-memory:
+  api-patches:
+  api-backups:
+  safe-workspace:
+  whisper-models:

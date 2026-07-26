@@ -1,0 +1,45 @@
+# ビルドコンテキストから除外するもの。
+#
+# 特に .env と .venv は必ず除外する:
+#   .env  — 秘密をイメージに焼き込むと、イメージを配布/共有した相手に渡る
+#   .venv — pyenv への symlink かつ macOS arm64 のバイナリで、Linux では動かない
+
+.venv/
+.Hermes2/
+venv/
+.env
+.env.*
+*.env
+
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+
+# 実行時に生成される状態 (named volume で永続化するため image には含めない)
+memory/
+patches/
+backups/
+events/
+data/
+*.db
+*.db-shm
+*.db-wal
+*.bak
+output.txt
+memory.json
+
+# 大きい・不要なもの
+yolo11n.pt
+.fuse_hidden*
+.DS_Store
+.python-version
+
+# Docker 自身
+Dockerfile
+docker-compose.yml
+.dockerignore
