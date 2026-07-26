@@ -31,7 +31,9 @@ faster-whisper==1.2.1
 # --- カメラ配信 (stream.py) ---
 # これも requirements.txt に記載が無かった
 flask==3.1.3
-opencv-python==5.0.0
+# cv2.__version__ は "5.0.0" を返すが PyPI の版番号は 4 桁。
+# .venv の実体 (pip show opencv-python) に合わせる。
+opencv-python==5.0.0.93
 # 人物検知 (ENABLE_YOLO=1 のとき必要。既定で有効)
 ultralytics
 
