@@ -28,5 +28,12 @@ python-telegram-bot==22.6
 # ctranslate2 を伴う。arm64 Linux でのインストール可否は確認済み
 faster-whisper==1.2.1
 
+# --- カメラ配信 (stream.py) ---
+# これも requirements.txt に記載が無かった
+flask==3.1.3
+opencv-python==5.0.0
+# 人物検知 (ENABLE_YOLO=1 のとき必要。既定で有効)
+ultralytics
+
 # --- テスト ---
 pytest
